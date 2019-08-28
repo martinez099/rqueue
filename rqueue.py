@@ -20,38 +20,45 @@ class RQueue(object):
         return int(self.redis.llen(PATTERN.format('access', self.name))) + \
             int(self.redis.llen(PATTERN.format('process', self.name)))
 
-    def push(self, _value):
+    def push(self, _value, _pipe=None):
         """
         Push a value onto the back of the queue.
 
         :param _value: The value to put into the queue.
+        :param _pipe: A Redis pipe, optional.
         :return: The amount of values in the list.
         """
-        return self.redis.lpush(PATTERN.format('access', self.name), _value)
+        r = _pipe if _pipe else self.redis
+        return r.lpush(PATTERN.format('access', self.name), _value)
 
-    def pop(self):
+    def pop(self, _pipe=None):
         """
         Pop the next value from the top of the queue. N.B: This is a non-blocking operation.
 
+        :param _pipe: A Redis pipe, optional.
         :return: The next value in the queue, else None.
         """
-        return self.redis.rpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name))
+        r = _pipe if _pipe else self.redis
+        return r.rpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name))
 
-    def bpop(self, _to=0):
+    def bpop(self, _to=0, _pipe=None):
         """
         Pop the next value from the top of the queue. N.B: This is a blocking operation iff the queue is empty.
 
-        :_to: Blocking timeout in seconds. N.B: defaults to 0, i.e. infinite
+        :param _to: Blocking timeout in seconds. N.B: defaults to 0, i.e. infinite
+        :param _pipe: A Redis pipe, optional.
         :return: The next value in the queue, else None.
         """
-        return self.redis.brpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name), _to)
+        r = _pipe if _pipe else self.redis
+        return r.brpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name), _to)
 
-    def ack(self, _value):
+    def ack(self, _value, _pipe=None):
         """
         Acknowledge a value from the queue, i.e. successfully processed.
 
         :param _value: The value to be acknowledged.
+        :param _pipe: A Redis pipe, optional.
         :return: Success.
         """
-        return bool(self.redis.lrem(PATTERN.format('process', self.name), 1, _value))
-
+        r = _pipe if _pipe else self.redis
+        return bool(r.lrem(PATTERN.format('process', self.name), 1, _value))
