@@ -8,13 +8,15 @@ class RQueue(object):
     An implementation of a reliable queue for Redis, see https://redis.io/commands/rpoplpush.
     """
 
-    def __init__(self, _name, _redis):
+    def __init__(self, _name, _redis, _ttl=None):
         """
         :param _name: The name of the queue.
         :param _redis: An Redis instance.
+        :param _ttl: Optional TTL.
         """
         self.name = _name
         self.redis = _redis
+        self.ttl = _ttl
 
     def __len__(self):
         return int(self.redis.llen(PATTERN.format('access', self.name))) + \
@@ -29,7 +31,11 @@ class RQueue(object):
         :return: The amount of values in the list.
         """
         r = _pipe if _pipe else self.redis
-        return r.lpush(PATTERN.format('access', self.name), _value)
+        pushed = r.lpush(PATTERN.format('access', self.name), _value)
+        if self.ttl:
+            r.expire(PATTERN.format('access', self.name), self.ttl)
+
+        return pushed
 
     def pop(self, _pipe=None):
         """
@@ -39,6 +45,7 @@ class RQueue(object):
         :return: The next value in the queue, else None.
         """
         r = _pipe if _pipe else self.redis
+
         return r.rpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name))
 
     def bpop(self, _to=0, _pipe=None):
@@ -50,6 +57,7 @@ class RQueue(object):
         :return: The next value in the queue, else None.
         """
         r = _pipe if _pipe else self.redis
+
         return r.brpoplpush(PATTERN.format('access', self.name), PATTERN.format('process', self.name), _to)
 
     def ack(self, _value, _pipe=None):
@@ -61,4 +69,5 @@ class RQueue(object):
         :return: Success.
         """
         r = _pipe if _pipe else self.redis
+
         return bool(r.lrem(PATTERN.format('process', self.name), 1, _value))
